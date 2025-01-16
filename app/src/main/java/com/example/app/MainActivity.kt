@@ -1,8 +1,12 @@
 package com.example.app
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
@@ -11,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -20,6 +25,7 @@ import androidx.compose.material.icons.filled.InsertChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app.domain.model.ReminderType
 import com.example.app.ui.screens.AppListScreen
@@ -29,6 +35,7 @@ import com.example.app.ui.viewmodels.AppSettingsViewModel
 import com.example.app.utils.PermissionManager
 import com.example.app.utils.FilePickerHelper
 import com.example.app.service.UsageMonitorService
+import android.app.ActivityManager
 
 class MainActivity : ComponentActivity() {
     private lateinit var permissionManager: PermissionManager
@@ -84,11 +91,46 @@ class MainActivity : ComponentActivity() {
             setupUI()
         }
 
-        // 启动监控服务
         if (checkUsageStatsPermission()) {
             startService(Intent(this, UsageMonitorService::class.java))
         } else {
             requestUsageStatsPermission()
+        }
+
+        // 检查悬浮窗权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            // 请求悬浮窗权限
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+        }
+    }
+
+    private fun testUsageStats() {
+        if (!checkUsageStatsPermission()) {
+            Log.d("UsageTest", "没有使用情况访问权限")
+            requestUsageStatsPermission()
+            return
+        }
+
+        val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val currentTime = System.currentTimeMillis()
+        val events = usageStatsManager.queryEvents(currentTime - 5 * 60 * 1000, currentTime)
+        val event = UsageEvents.Event()
+        
+        Log.d("UsageTest", "开始查询使用情况...")
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    Log.d("UsageTest", "应用启动: ${event.packageName}")
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    Log.d("UsageTest", "应用退出: ${event.packageName}")
+                }
+            }
         }
     }
 
@@ -173,20 +215,51 @@ class MainActivity : ComponentActivity() {
 
     private fun checkUsageStatsPermission(): Boolean {
         val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        return try {
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             appOps.unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_GET_USAGE_STATS,
                 Process.myUid(),
                 packageName
-            ) == AppOpsManager.MODE_ALLOWED
-        } catch (e: Exception) {
-            Log.e("MainActivity", "检查使用情况权限时出错", e)
-            false
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                packageName
+            )
         }
+        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     private fun requestUsageStatsPermission() {
         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 检查服务是否在运行，如果没有则重启
+        if (checkUsageStatsPermission() && !isServiceRunning(UsageMonitorService::class.java)) {
+            startService(Intent(this, UsageMonitorService::class.java))
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        try {
+            // 对于 Android 11 (API 30) 及以上版本，直接返回 true
+            // 因为新版本 Android 不再支持查询其他应用的服务状态
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                return true
+            }
+            
+            val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            return manager.getRunningServices(Integer.MAX_VALUE)
+                .any { it.service.className == serviceClass.name }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "检查服务状态失败", e)
+            return false
+        }
     }
 }
 

@@ -1,18 +1,12 @@
 package com.example.app.utils
 
-import android.app.Dialog
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
-import android.view.LayoutInflater
-import android.widget.ImageView
-import android.widget.VideoView
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.unit.dp
+import android.os.Build
+import android.provider.Settings
+import android.util.Log
+import android.widget.Toast
 import com.example.app.domain.model.AppSettings
 import com.example.app.domain.model.ReminderType
 
@@ -29,101 +23,53 @@ class ReminderManager(private val context: Context) {
     }
 
     private fun showTextReminder(content: String) {
-        Dialog(context).apply {
-            setContentView(
-                ComposeView(context).apply {
-                    setContent {
-                        TextReminderContent(
-                            content = content,
-                            onDismiss = { dismiss() }
-                        )
-                    }
-                }
-            )
-            show()
-        }
-    }
-
-    @Composable
-    private fun TextReminderContent(
-        content: String,
-        onDismiss: () -> Unit
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth()
-            ) {
-                Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("我知道了")
-                }
-            }
+        try {
+            Toast.makeText(context.applicationContext, content, Toast.LENGTH_LONG).show()
+            Log.d("ReminderManager", "Toast 显示成功")
+        } catch (e: Exception) {
+            Log.e("ReminderManager", "显示提醒失败", e)
         }
     }
 
     private fun showImageReminder(imagePath: String) {
-        Dialog(context).apply {
-            val imageView = ImageView(context).apply {
-                setImageURI(Uri.parse(imagePath))
-            }
-            setContentView(imageView)
-            show()
+        try {
+            Toast.makeText(context.applicationContext, "图片提醒: $imagePath", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Log.e("ReminderManager", "显示图片提醒失败", e)
         }
     }
 
     private fun playAudioReminder(audioPath: String) {
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(audioPath)
-            prepare()
-            start()
-            setOnCompletionListener {
-                release()
-                mediaPlayer = null
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(audioPath)
+                prepare()
+                start()
+                setOnCompletionListener {
+                    release()
+                    mediaPlayer = null
+                }
             }
+            Toast.makeText(context.applicationContext, "正在播放音频提醒", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("ReminderManager", "播放音频提醒失败", e)
         }
     }
 
     private fun showVideoReminder(videoPath: String) {
-        Dialog(context).apply {
-            val videoView = VideoView(context).apply {
-                setVideoURI(Uri.parse(videoPath))
-                start()
-            }
-            setContentView(videoView)
-            show()
+        try {
+            Toast.makeText(context.applicationContext, "视频提醒: $videoPath", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Log.e("ReminderManager", "显示视频提醒失败", e)
         }
     }
 
     fun showTimeoutReminder(settings: AppSettings) {
-        Dialog(context).apply {
-            setContentView(
-                ComposeView(context).apply {
-                    setContent {
-                        TextReminderContent(
-                            content = settings.timeoutMessage.ifEmpty { 
-                                "你已经使用该应用${settings.timeLimit}分钟了" 
-                            },
-                            onDismiss = { dismiss() }
-                        )
-                    }
-                }
-            )
-            show()
-        }
+        showTextReminder(
+            settings.timeoutMessage.ifEmpty { 
+                "你已经使用该应用${settings.timeLimit}分钟了" 
+            }
+        )
     }
 }
