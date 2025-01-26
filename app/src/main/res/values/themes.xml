@@ -2,4 +2,15 @@
 <resources>
 
     <style name="Theme.APP" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.App.Reminder" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@style/ReminderAnimation</item>
+    </style>
+
+    <style name="ReminderAnimation">
+        <item name="android:windowEnterAnimation">@anim/fade_in</item>
+        <item name="android:windowExitAnimation">@anim/fade_out</item>
+    </style>
 </resources>

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">APP</string>
+    <string name="reminder_title">使用提醒</string>
+    <string name="reminder_confirm">我知道了</string>
 </resources>

@@ -124,6 +124,7 @@ class UsageMonitorService : Service() {
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED -> {
                     updateAppUsageTime(usageEvent.packageName, usageEvent.timeStamp)
+                    reminderManager.resetReminder()
                 }
             }
         }
